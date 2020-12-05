@@ -87,6 +87,7 @@ function step2() {
                     console.log(`cookie OGWeb: ${OGWeb}`);
                 }
                 console.log('Step2 done.');
+                step3();
             } else {
                 let msg = `Step2 HTTP error: ${response.statusMessage}`;
                 console.error(msg);
@@ -125,6 +126,69 @@ function step2() {
 
     req.write(postData);    // NOTE:
     req.end();              // = req.end(postData)
+}
+
+//
+// Step 3: Open EntryLogQueryForm.aspx page to get hidden input '_ASPNetRecycleSession', '__VIEWSTATE' and '__EVENTVALIDATION'.
+//
+var __VIEWSTATE = '';	// not changed?
+var __EVENTVALIDATION = '';
+
+function step3() {
+
+    function callback(response) {
+        let chunks = [];
+        response.addListener('data', (chunk) => {
+            chunks.push(chunk);
+        });
+        response.on('end', () => {
+            let buff = Buffer.concat(chunks);
+            let html = buff.toString();
+            if (response.statusCode===200) {
+                let fo = fs.createWriteStream('tmp/step3.html');
+                fo.write(html);
+                fo.end();
+                let patm =  new RegExp('<input type="hidden" name="_ASPNetRecycleSession" id="_ASPNetRecycleSession" value="(.*?)" />');
+                let mm = patm.exec(html);
+                if (mm) {
+                    _ASPNetRecycleSession = mm[1];
+                    console.log(`_ASPNetRecycleSession: ${_ASPNetRecycleSession}`);
+                }
+                let patv =  new RegExp('<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="(.*?)"');
+                let mv = patv.exec(html);
+                if (mv) {
+                    __VIEWSTATE = mv[1];
+                    console.log(`__VIEWSTATE: ${__VIEWSTATE}`);
+                }
+                let pate =  new RegExp('<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="(.*?)"');
+                let me = pate.exec(html);
+                if (me) {
+                    __EVENTVALIDATION = me[1];
+                    console.log(`__EVENTVALIDATION: ${__EVENTVALIDATION}`);
+                }
+                console.log('Step3 done.');
+            } else {
+                let msg = `Step3 HTTP error: ${response.statusMessage}`;
+                console.error(msg);
+            }
+        });
+    }
+
+    let req = http.request({
+        hostname: "twhratsql.whq.wistron",
+        path: "/OGWeb/OGWebReport/EntryLogQueryForm.aspx",
+        //method: "GET",    // Default can be omitted.
+        headers: {
+            'Cookie': `ASP.NET_SessionId=${_ASPNET_SessionId}; OGWeb=${OGWeb}`  // important
+        }
+    }, callback);
+
+    req.on('error', e => {
+        let msg = `Step3 Problem: ${e.message}`;
+        console.error(msg);
+    });
+
+    req.end();
 }
 
 step1();
