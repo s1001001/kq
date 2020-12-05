@@ -131,7 +131,7 @@ function step2() {
 //
 // Step 3: Open EntryLogQueryForm.aspx page to get hidden input '_ASPNetRecycleSession', '__VIEWSTATE' and '__EVENTVALIDATION'.
 //
-var __VIEWSTATE = '';	// not changed?
+var __VIEWSTATE = '';
 var __EVENTVALIDATION = '';
 
 function step3() {
@@ -167,6 +167,7 @@ function step3() {
                     console.log(`__EVENTVALIDATION: ${__EVENTVALIDATION}`);
                 }
                 console.log('Step3 done.');
+                step4();
             } else {
                 let msg = `Step3 HTTP error: ${response.statusMessage}`;
                 console.error(msg);
@@ -189,6 +190,94 @@ function step3() {
     });
 
     req.end();
+}
+
+//
+// Step 4: POST data to inquire.
+//
+function step4() {
+
+    function callback(response) {
+        let chunks = [];
+        response.addListener('data', (chunk) => {
+            chunks.push(chunk);
+        });
+        response.on('end', () => {
+            let buff = Buffer.concat(chunks);
+            let html = buff.toString();
+            if (response.statusCode===200) {
+                let fo = fs.createWriteStream('tmp/step4.html');
+                fo.write(html);
+                fo.end();
+                parseKQ(html);
+                console.log('Step4 done.');
+            } else {
+                let msg = `Step4 HTTP error: ${response.statusMessage}`;
+                console.error(msg);
+            }
+        });
+    }
+
+    // NOTE: 这些参数应该让使用者输入
+    var BeginDate = '12/4/2020';
+    var EndDate = '12/4/2020';
+    var BeginTime = '0:00';
+    var EndTime = '23:59';
+    var employeeId = '8106062';
+
+    let postData = querystring.stringify({
+        'TQuarkScriptManager1': 'QueryResultUpdatePanel|QueryBtn',
+        'TQuarkScriptManager1_HiddenField': ';;AjaxControlToolkit, Version=1.0.20229.20821, Culture=neutral, PublicKeyToken=28f01b0e84b6d53e:en-US:c5c982cc-4942-4683-9b48-c2c58277700f:411fea1c:865923e8;;AjaxControlToolkit, Version=1.0.20229.20821, Culture=neutral, PublicKeyToken=28f01b0e84b6d53e:en-US:c5c982cc-4942-4683-9b48-c2c58277700f:91bd373d:d7d5263e:f8df1b50;;AjaxControlToolkit, Version=1.0.20229.20821, Culture=neutral, PublicKeyToken=28f01b0e84b6d53e:en-US:c5c982cc-4942-4683-9b48-c2c58277700f:e7c87f07:bbfda34c:30a78ec5;;AjaxControlToolkit, Version=1.0.20229.20821, Culture=neutral, PublicKeyToken=28f01b0e84b6d53e:en-US:c5c982cc-4942-4683-9b48-c2c58277700f:9b7907bc:9349f837:d4245214;;AjaxControlToolkit, Version=1.0.20229.20821, Culture=neutral, PublicKeyToken=28f01b0e84b6d53e:en-US:c5c982cc-4942-4683-9b48-c2c58277700f:e3d6b3ac;',
+        '__ctl07_Scroll': '0,0',
+        '__VIEWSTATEGENERATOR': 'A21EDEFC',
+        'QueryBtn': 'Inquire',
+        '_ASPNetRecycleSession': _ASPNetRecycleSession,
+        '__VIEWSTATE': __VIEWSTATE,
+        '_PageInstance': 4,
+        '__EVENTVALIDATION': __EVENTVALIDATION,
+        'AttNoNameCtrl1$InputTB': '上海欽江路',
+        'BeginDateTB$Editor': BeginDate,
+        'BeginDateTB$_TimeEdit': BeginTime,
+        'EndDateTB$Editor': EndDate,
+        'EndDateTB$_TimeEdit': EndTime,
+        'EmpNoNameCtrl1$InputTB': employeeId
+    });
+    console.log(postData);
+
+    let req = http.request({
+        hostname: "twhratsql.whq.wistron",
+        path: "/OGWeb/OGWebReport/EntryLogQueryForm.aspx",
+        method: "POST",
+        headers: {
+            'User-Agent': 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 10.0; WOW64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729; MAARJS)',	// mimic IE 11 // important
+            'X-MicrosoftAjax': 'Delta=true',    // important
+            'Cookie': `ASP.NET_SessionId=${_ASPNET_SessionId}; OGWeb=${OGWeb}`,  // important
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Length': Buffer.byteLength(postData)
+        }
+    }, callback);
+
+    req.on('error', e => {
+        let msg = `Step4 Problem: ${e.message}`;
+        console.error(msg);
+    });
+
+    req.end(postData);
+}
+
+function parseKQ(html) {
+    console.log(`/Department /Employee No.  /Employee Name  /Card Number    /Clock Time`);
+    while (true) {
+        let p =  new RegExp('<td>(.*?)</td><td>&nbsp;</td><td><.*?>(.*?)</a></td><td>(.*?)</td><td>(.*?)</td><td>(.*?)</td>',
+            'g');   // NOTE: 'g' is important
+        let m = p.exec(html);
+        if (m) {
+            console.log(`${m[1]} ${m[2]} ${m[3]} ${m[4]} ${m[5]}`);
+            html = html.substr(p.lastIndex);
+        } else {
+			break;
+		}
+    }
 }
 
 step1();
