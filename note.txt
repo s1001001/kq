@@ -1,0 +1,53 @@
+nodejs training
+Agenda
+	nodejs
+		event driven and single thread
+		var vs. let; global/function scope vs. block scope
+		arrow function
+		RegExp very powerful
+		How to use http.request
+		querystring: explicitly imported, npm install querystring
+D:\github\kq\index.js:94
+    let postData = querystring.stringify({
+                   ^
+
+ReferenceError: querystring is not defined
+    at step2 (D:\github\kq\index.js:94:20)
+    at IncomingMessage.response.on (D:\github\kq\index.js:46:17)
+    at IncomingMessage.emit (events.js:194:15)
+    at endReadableNT (_stream_readable.js:1125:12)
+    at process._tickCallback (internal/process/next_tick.js:63:19)
+
+	github
+	source control
+	code review
+	const/var let scope and life cycle
+	How to write comments. what?
+	import/export module
+	callback vs. promise vs. await/async.
+
+D:\github>mkdir kq
+cd kq
+npm init
+// This utility will walk you through creating a package.json file.
+// entry point: (index.js)
+// git repository: https://github.com/alex632/kq
+"start": "node index.js",
+
+How to start?
+	node index.js
+	npm start
+
+HTTP header:
+Set-Cookie: ASP.NET_SessionId=420tmx55b5l00nip05npfg45; path=/; HttpOnly
+Content:
+<input type="hidden" name="_ASPNetRecycleSession" id="_ASPNetRecycleSession" value="16f6a1eb-ff57-41f6-be53-7a450fb3a5d4" />
+
+Insights:
+event driven
+http.request
+RegExp
+github
+.gitignore
+npm install	querystring	// import module
+
