@@ -113,7 +113,7 @@ function step2() {
         path: "/OGWeb/LoginForm.aspx",
         method: "POST",
         headers: {
-            'Cookie': `ASP.NET_SessionId=`+_ASPNET_SessionId,   // NOTED.
+            'Cookie': 'ASP.NET_SessionId='+_ASPNET_SessionId,   // NOTED.
             'Content-Type': 'application/x-www-form-urlencoded',
             'Content-Length': Buffer.byteLength(postData)
         }
@@ -158,16 +158,16 @@ function step3() {
                 let mv = patv.exec(html);
                 if (mv) {
                     __VIEWSTATE = mv[1];
-                    console.log(`__VIEWSTATE: ${__VIEWSTATE}`);
+                    //console.log(`__VIEWSTATE: ${__VIEWSTATE}`);
                 }
                 let pate =  new RegExp('<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="(.*?)"');
                 let me = pate.exec(html);
                 if (me) {
                     __EVENTVALIDATION = me[1];
-                    console.log(`__EVENTVALIDATION: ${__EVENTVALIDATION}`);
+                    //console.log(`__EVENTVALIDATION: ${__EVENTVALIDATION}`);
                 }
                 console.log('Step3 done.');
-                step4();
+                askAll2();
             } else {
                 let msg = `Step3 HTTP error: ${response.statusMessage}`;
                 console.error(msg);
@@ -195,7 +195,7 @@ function step3() {
 //
 // Step 4: POST data to inquire.
 //
-function step4() {
+function inquire(beginDate, endDate, employeeIdOrName, nextStep) {
 
     function callback(response) {
         let chunks = [];
@@ -206,24 +206,23 @@ function step4() {
             let buff = Buffer.concat(chunks);
             let html = buff.toString();
             if (response.statusCode===200) {
-                let fo = fs.createWriteStream('tmp/step4.html');
+                let fo = fs.createWriteStream(`tmp/inquire-${employeeIdOrName}.html`);
                 fo.write(html);
                 fo.end();
                 parseKQ(html);
-                console.log('Step4 done.');
+                console.log(`Inquiry about ${employeeIdOrName} is done.`);
+                if ( nextStep ) {   // If provided.
+                    nextStep();
+                }
             } else {
-                let msg = `Step4 HTTP error: ${response.statusMessage}`;
+                let msg = `Inquiry HTTP error: ${response.statusMessage}`;
                 console.error(msg);
             }
         });
     }
 
-    // NOTE: 这些参数应该让使用者输入
-    var BeginDate = '12/4/2020';
-    var EndDate = '12/4/2020';
-    var BeginTime = '0:00';
-    var EndTime = '23:59';
-    var employeeId = '8106062';
+    var beginTime = '0:00';
+    var endTime = '23:59';
 
     let postData = querystring.stringify({
         'TQuarkScriptManager1': 'QueryResultUpdatePanel|QueryBtn',
@@ -236,13 +235,13 @@ function step4() {
         '_PageInstance': 4,
         '__EVENTVALIDATION': __EVENTVALIDATION,
         'AttNoNameCtrl1$InputTB': '上海欽江路',
-        'BeginDateTB$Editor': BeginDate,
-        'BeginDateTB$_TimeEdit': BeginTime,
-        'EndDateTB$Editor': EndDate,
-        'EndDateTB$_TimeEdit': EndTime,
-        'EmpNoNameCtrl1$InputTB': employeeId
+        'BeginDateTB$Editor': beginDate,
+        'BeginDateTB$_TimeEdit': beginTime,
+        'EndDateTB$Editor': endDate,
+        'EndDateTB$_TimeEdit': endTime,
+        'EmpNoNameCtrl1$InputTB': employeeIdOrName
     });
-    console.log(postData);
+    //console.log(postData);
 
     let req = http.request({
         hostname: "twhratsql.whq.wistron",
@@ -278,6 +277,24 @@ function parseKQ(html) {
 			break;
 		}
     }
+}
+
+// Submit requests simultaneously and the sequence of returns are not predictable.
+// And we don't know when it ends.
+function askAll() {
+    inquire('2020-12-1', '2020-12-25', '余圣骏');
+    inquire('2020-12-24', '2020-12-25', 'S2005001');
+    inquire('2020-12-4', '2020-12-24', 'Joy Yang');
+    inquire('2020-12-24', '2020-12-24', 'Rebecca');
+}
+
+// Submit requests sequentially.
+function askAll2() {
+    inquire('2020-12-1', '2020-12-25', '余圣骏',
+        ()=> inquire('2020-12-24', '2020-12-25', 'S2005001',
+            ()=>inquire('2020-12-4', '2020-12-24', 'Joy Yang',
+                ()=>inquire('2020-12-24', '2020-12-24', 'Rebecca',
+                    ()=>console.log("All done.")))));
 }
 
 step1();

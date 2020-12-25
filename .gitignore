@@ -104,4 +104,4 @@ dist
 .tern-port
 
 # execution output files
-tmp/
+tmp/*.html
