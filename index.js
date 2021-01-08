@@ -6,6 +6,7 @@
 
 const http = require('http');   // NOTE: import default module
 const fs = require('fs');       // NOTE: import default module
+const querystring = require('querystring'); // NOTE: import default module
 
 //
 // Step 1: Open login page to get cookie 'ASP.NET_SessionId' and hidden input '_ASPNetRecycleSession'.
@@ -13,7 +14,7 @@ const fs = require('fs');       // NOTE: import default module
 var _ASPNET_SessionId;
 var _ASPNetRecycleSession;
 
-function step1() {
+function openLoginPage() {
 
     function callback(response) {
         let chunks = [];
@@ -24,7 +25,7 @@ function step1() {
             let buff = Buffer.concat(chunks);
             let html = buff.toString();
             if (response.statusCode===200) {
-                let fo = fs.createWriteStream('tmp/step1.html');
+                let fo = fs.createWriteStream('tmp/step1-LoginPage.html');
                 fo.write(html);
                 fo.end();
                 let cookie = response.headers['set-cookie'][0];
@@ -32,16 +33,16 @@ function step1() {
                 let mc = patc.exec(cookie);
                 if (mc) {
                     _ASPNET_SessionId = mc[1];
-                    console.log(`cookie ASP.NET_SessionId: ${_ASPNET_SessionId}`);
+                    console.log(`Cookie ASP.NET_SessionId: ${_ASPNET_SessionId}`);
                 }
                 let patm =  new RegExp('<input type="hidden" name="_ASPNetRecycleSession" id="_ASPNetRecycleSession" value="(.*?)" />');
                 let mm = patm.exec(html);
                 if (mm) {
                     _ASPNetRecycleSession = mm[1];
-                    console.log(`_ASPNetRecycleSession: ${_ASPNetRecycleSession}`);
+                    console.log(`Element _ASPNetRecycleSession: ${_ASPNetRecycleSession}`);
                 }
-                console.log('Step1 done.');
-                step2();
+                console.log('Step1 login page got.');
+                login();
             } else {
                 let msg = `Step1 HTTP error: ${response.statusMessage}`;
                 console.error(msg);
@@ -62,10 +63,9 @@ function step1() {
 //
 // Step 2: POST data to login to get cookie 'OGWeb'.
 //
-const querystring = require('querystring'); // NOTE: explicitly imported
 var OGWeb;
 
-function step2() {
+function login() {
 
     function callback(response) {
         let chunks = [];
@@ -76,7 +76,7 @@ function step2() {
             let buff = Buffer.concat(chunks);
             let html = buff.toString();
             if (response.statusCode===302) {
-                let fo = fs.createWriteStream('tmp/step2.html');
+                let fo = fs.createWriteStream('tmp/step2-login.html');
                 fo.write(html);
                 fo.end();
                 let cookie = response.headers['set-cookie'][0];
@@ -84,7 +84,7 @@ function step2() {
                 let mc = patc.exec(cookie);
                 if (mc) {
                     OGWeb = mc[1];
-                    console.log(`cookie OGWeb: ${OGWeb}`);
+                    console.log('Cookie OGWeb got.');
                 }
                 console.log('Step2 done.');
                 step3();
@@ -152,22 +152,22 @@ function step3() {
                 let mm = patm.exec(html);
                 if (mm) {
                     _ASPNetRecycleSession = mm[1];
-                    console.log(`_ASPNetRecycleSession: ${_ASPNetRecycleSession}`);
+                    console.log(`Element _ASPNetRecycleSession: ${_ASPNetRecycleSession}`);
                 }
                 let patv =  new RegExp('<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="(.*?)"');
                 let mv = patv.exec(html);
                 if (mv) {
                     __VIEWSTATE = mv[1];
-                    //console.log(`__VIEWSTATE: ${__VIEWSTATE}`);
+                    console.log('Element __VIEWSTATE got');
                 }
                 let pate =  new RegExp('<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="(.*?)"');
                 let me = pate.exec(html);
                 if (me) {
                     __EVENTVALIDATION = me[1];
-                    //console.log(`__EVENTVALIDATION: ${__EVENTVALIDATION}`);
+                    console.log('Element __EVENTVALIDATION got');
                 }
                 console.log('Step3 done.');
-                askAll2();
+                askAll();
             } else {
                 let msg = `Step3 HTTP error: ${response.statusMessage}`;
                 console.error(msg);
@@ -195,7 +195,16 @@ function step3() {
 //
 // Step 4: POST data to inquire.
 //
-function inquire(beginDate, endDate, employeeIdOrName, nextStep) {
+/**
+ * 截取某人的刷卡资料。
+ * 函数注解就该这么写。
+ * @param {*} beginDate 开始日期
+ * @param {*} endDate 截止日期
+ * @param {*} employeeIdOrName 工号或名字
+ * @param {*} nextPage if go to next page
+ * @param {*} nextStep 下一步做啥？
+ */
+function inquire(beginDate, endDate, employeeIdOrName, nextPage, nextStep) {
 
     function callback(response) {
         let chunks = [];
@@ -205,18 +214,21 @@ function inquire(beginDate, endDate, employeeIdOrName, nextStep) {
         response.on('end', () => {
             let buff = Buffer.concat(chunks);
             let html = buff.toString();
-            if (response.statusCode===200) {
-                let fo = fs.createWriteStream(`tmp/inquire-${employeeIdOrName}.html`);
+            if ( response.statusCode === 200 ) {
+                let result = parseKQ(html);
+                let fo = fs.createWriteStream(`tmp/step4-inquire-${employeeIdOrName}-${result.curPage}.html`);
                 fo.write(html);
                 fo.end();
-                parseKQ(html);
-                console.log(`Inquiry about ${employeeIdOrName} is done.`);
-                if ( nextStep ) {   // If provided.
-                    nextStep();
+                if ( result.curPage < result.numPages ) {
+                    inquire(beginDate, endDate, employeeIdOrName, true, nextStep);
+                } else {
+                    console.log(`Inquiry about ${employeeIdOrName} is done.`);
+                    if ( nextStep ) {   // If provided.
+                        nextStep();
+                    }
                 }
             } else {
-                let msg = `Inquiry HTTP error: ${response.statusMessage}`;
-                console.error(msg);
+                console.error(`Inquiry HTTP error: ${response.statusMessage}`);
             }
         });
     }
@@ -224,15 +236,14 @@ function inquire(beginDate, endDate, employeeIdOrName, nextStep) {
     var beginTime = '0:00';
     var endTime = '23:59';
 
-    let postData = querystring.stringify({
+    let postObj = {
         'TQuarkScriptManager1': 'QueryResultUpdatePanel|QueryBtn',
         'TQuarkScriptManager1_HiddenField': ';;AjaxControlToolkit, Version=1.0.20229.20821, Culture=neutral, PublicKeyToken=28f01b0e84b6d53e:en-US:c5c982cc-4942-4683-9b48-c2c58277700f:411fea1c:865923e8;;AjaxControlToolkit, Version=1.0.20229.20821, Culture=neutral, PublicKeyToken=28f01b0e84b6d53e:en-US:c5c982cc-4942-4683-9b48-c2c58277700f:91bd373d:d7d5263e:f8df1b50;;AjaxControlToolkit, Version=1.0.20229.20821, Culture=neutral, PublicKeyToken=28f01b0e84b6d53e:en-US:c5c982cc-4942-4683-9b48-c2c58277700f:e7c87f07:bbfda34c:30a78ec5;;AjaxControlToolkit, Version=1.0.20229.20821, Culture=neutral, PublicKeyToken=28f01b0e84b6d53e:en-US:c5c982cc-4942-4683-9b48-c2c58277700f:9b7907bc:9349f837:d4245214;;AjaxControlToolkit, Version=1.0.20229.20821, Culture=neutral, PublicKeyToken=28f01b0e84b6d53e:en-US:c5c982cc-4942-4683-9b48-c2c58277700f:e3d6b3ac;',
         '__ctl07_Scroll': '0,0',
         '__VIEWSTATEGENERATOR': 'A21EDEFC',
-        'QueryBtn': 'Inquire',
         '_ASPNetRecycleSession': _ASPNetRecycleSession,
         '__VIEWSTATE': __VIEWSTATE,
-        '_PageInstance': 4,
+        '_PageInstance': 26,
         '__EVENTVALIDATION': __EVENTVALIDATION,
         'AttNoNameCtrl1$InputTB': '上海欽江路',
         'BeginDateTB$Editor': beginDate,
@@ -240,8 +251,14 @@ function inquire(beginDate, endDate, employeeIdOrName, nextStep) {
         'EndDateTB$Editor': endDate,
         'EndDateTB$_TimeEdit': endTime,
         'EmpNoNameCtrl1$InputTB': employeeIdOrName
-    });
-    //console.log(postData);
+    };
+    if ( nextPage ) {
+        postObj['GridPageNavigator1$NextBtn'] = 'Next Page';
+    } else {
+        postObj['QueryBtn'] = 'Inquire';
+    }
+
+    let postData = querystring.stringify(postObj);
 
     let req = http.request({
         hostname: "twhratsql.whq.wistron",
@@ -257,44 +274,62 @@ function inquire(beginDate, endDate, employeeIdOrName, nextStep) {
     }, callback);
 
     req.on('error', e => {
-        let msg = `Step4 Problem: ${e.message}`;
-        console.error(msg);
+        console.error(`Step4 Problem: ${e.message}`);
     });
 
     req.end(postData);
 }
 
+/**
+ * Parse the input html to get 刷卡 data.
+ * @param {*} html 
+ * @return number of current page and number of total pages.
+ */
 function parseKQ(html) {
-    console.log(`/Department /Employee No.  /Employee Name  /Card Number    /Clock Time`);
+    let curPage = 1;
+    let numPages = 1;
+    let rexTotal = new RegExp('<span id="GridPageNavigator1_CurrentPageLB">(.*?)</span>[^]*?<span id="GridPageNavigator1_TotalPageLB">(.*?)</span>');
+    let match = rexTotal.exec(html);
+    if ( match ) {
+        curPage = parseInt(match[1]);
+        numPages = parseInt(match[2]);
+        console.log(`Page: ${curPage} / ${numPages}`);
+    }
+    // Update __VIEWSTATE __EVENTVALIDATION
+    let rexVS = new RegExp("__VIEWSTATE[\|](.*?)[\|]");
+    let matVS = rexVS.exec(html);
+    if ( matVS ) {
+        __VIEWSTATE = matVS[1];
+    }
+    let rexEV = new RegExp("__EVENTVALIDATION[\|](.*?)[\|]");
+    let matEV = rexEV.exec(html);
+    if ( matEV ) {
+        __EVENTVALIDATION = matEV[1];
+    }
+    console.log(`/Department  /Employee No.  /Employee Name  /Clock Time`);
     while (true) {
-        let p =  new RegExp('<td>(.*?)</td><td>&nbsp;</td><td><.*?>(.*?)</a></td><td>(.*?)</td><td>(.*?)</td><td>(.*?)</td>',
+        let rex =  new RegExp('<td>(.*?)</td><td>&nbsp;</td><td><.*?>(.*?)</a></td><td>(.*?)</td><td>.*?</td><td>(.*?)</td>',
             'g');   // NOTE: 'g' is important
-        let m = p.exec(html);
+        let m = rex.exec(html);
         if (m) {
-            console.log(`${m[1]} ${m[2]} ${m[3]} ${m[4]} ${m[5]}`);
-            html = html.substr(p.lastIndex);
+            console.log(`${m[1]} ${m[2]} ${m[3]} ${m[4]}`);
+            html = html.substr(rex.lastIndex);
         } else {
 			break;
 		}
     }
-}
-
-// Submit requests simultaneously and the sequence of returns are not predictable.
-// And we don't know when it ends.
-function askAll() {
-    inquire('2020-12-1', '2020-12-25', '余圣骏');
-    inquire('2020-12-24', '2020-12-25', 'S2005001');
-    inquire('2020-12-4', '2020-12-24', 'Joy Yang');
-    inquire('2020-12-24', '2020-12-24', 'Rebecca');
+    return {curPage: curPage, numPages: numPages};
 }
 
 // Submit requests sequentially.
-function askAll2() {
-    inquire('2020-12-1', '2020-12-25', '余圣骏',
-        ()=> inquire('2020-12-24', '2020-12-25', 'S2005001',
-            ()=>inquire('2020-12-4', '2020-12-24', 'Joy Yang',
-                ()=>inquire('2020-12-24', '2020-12-24', 'Rebecca',
-                    ()=>console.log("All done.")))));
+function askAll() {
+    inquire('2020-12-24', '2021-1-8', '李旭超', false,
+        ()=>inquire('2020-12-24', '2021-1-8', 'S2008001', false,                // 刘毅炫
+            ()=>inquire('2020-12-24', '2021-1-8', 'ANNE', false,                // 刘诗倩, name can be partial
+                ()=>inquire('2020-12-24', '2021-1-8', 'LEO MY CHEN', false,     // 陈梦宇
+                    ()=>inquire('2020-12-24', '2021-1-8', 'S0203002', false,    // 郑晓雁
+                        ()=>console.log("All done."))))));
+                    
 }
 
-step1();
+openLoginPage();    // Where it all begins.
