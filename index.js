@@ -41,7 +41,7 @@ function openLoginPage() {
                     _ASPNetRecycleSession = mm[1];
                     console.log(`Element _ASPNetRecycleSession: ${_ASPNetRecycleSession}`);
                 }
-                console.log('Step1 login page got.');
+                console.log('Step1 login page got.\n');
                 login();
             } else {
                 let msg = `Step1 HTTP error: ${response.statusMessage}`;
@@ -86,7 +86,7 @@ function login() {
                     OGWeb = mc[1];
                     console.log('Cookie OGWeb got.');
                 }
-                console.log('Step2 done.');
+                console.log('Step2 done.\n');
                 step3();
             } else {
                 let msg = `Step2 HTTP error: ${response.statusMessage}`;
@@ -124,8 +124,8 @@ function login() {
         console.error(msg);
     });
 
-    req.write(postData);    // NOTE:
-    req.end();              // = req.end(postData)
+    req.write(postData);
+    req.end();
 }
 
 //
@@ -166,7 +166,7 @@ function step3() {
                     __EVENTVALIDATION = me[1];
                     console.log('Element __EVENTVALIDATION got');
                 }
-                console.log('Step3 done.');
+                console.log('Step3 done.\n');
                 askAll();
             } else {
                 let msg = `Step3 HTTP error: ${response.statusMessage}`;
@@ -197,12 +197,11 @@ function step3() {
 //
 /**
  * 截取某人的刷卡资料。
- * 函数注解就该这么写。
  * @param {*} beginDate 开始日期
  * @param {*} endDate 截止日期
  * @param {*} employeeIdOrName 工号或名字
  * @param {*} nextPage if go to next page
- * @param {*} nextStep 下一步做啥？
+ * @param {*} nextStep 完成后调用此function
  */
 function inquire(beginDate, endDate, employeeIdOrName, nextPage, nextStep) {
 
@@ -286,6 +285,7 @@ function inquire(beginDate, endDate, employeeIdOrName, nextPage, nextStep) {
  * @return number of current page and number of total pages.
  */
 function parseKQ(html) {
+    // Get number of pages.
     let curPage = 1;
     let numPages = 1;
     let rexTotal = new RegExp('<span id="GridPageNavigator1_CurrentPageLB">(.*?)</span>[^]*?<span id="GridPageNavigator1_TotalPageLB">(.*?)</span>');
@@ -295,6 +295,7 @@ function parseKQ(html) {
         numPages = parseInt(match[2]);
         console.log(`Page: ${curPage} / ${numPages}`);
     }
+
     // Update __VIEWSTATE __EVENTVALIDATION
     let rexVS = new RegExp("__VIEWSTATE[\|](.*?)[\|]");
     let matVS = rexVS.exec(html);
@@ -306,7 +307,9 @@ function parseKQ(html) {
     if ( matEV ) {
         __EVENTVALIDATION = matEV[1];
     }
-    console.log(`/Department  /Employee No.  /Employee Name  /Clock Time`);
+
+    // Print 刷卡 data
+    console.log(`/Department  /EID  /Name  /Clock Time`);
     while (true) {
         let rex =  new RegExp('<td>(.*?)</td><td>&nbsp;</td><td><.*?>(.*?)</a></td><td>(.*?)</td><td>.*?</td><td>(.*?)</td>',
             'g');   // NOTE: 'g' is important
@@ -321,15 +324,13 @@ function parseKQ(html) {
     return {curPage: curPage, numPages: numPages};
 }
 
-// Submit requests sequentially.
 function askAll() {
-    inquire('2020-12-24', '2021-1-8', '李旭超', false,
-        ()=>inquire('2020-12-24', '2021-1-8', 'S2008001', false,                // 刘毅炫
-            ()=>inquire('2020-12-24', '2021-1-8', 'ANNE', false,                // 刘诗倩, name can be partial
-                ()=>inquire('2020-12-24', '2021-1-8', 'LEO MY CHEN', false,     // 陈梦宇
-                    ()=>inquire('2020-12-24', '2021-1-8', 'S0203002', false,    // 郑晓雁
-                        ()=>console.log("All done."))))));
-                    
+    inquire('2020-12-24', '2021-1-11', 'john', false,
+    ()=> inquire('2020-12-28', '2021-1-11', 'S2008001', false,
+    ()=> inquire('2020-12-24', '2021-1-6', 'ANNE', false,
+    ()=> inquire('2020-12-25', '2021-1-08', 'LEO MY CHEN', false,
+    ()=> inquire('2021-01-7', '2021-1-11', 'S0203002', false,
+    function() { console.log("All done.") } )))));
 }
 
 openLoginPage();    // Where it all begins.
