@@ -24,7 +24,7 @@ function openLoginPage() {
         response.on('end', () => {
             let buff = Buffer.concat(chunks);
             let html = buff.toString();
-            if (response.statusCode===200) {
+            if (response.statusCode === 200) {
                 let fo = fs.createWriteStream('tmp/step1-LoginPage.html');
                 fo.write(html);
                 fo.end();
@@ -35,7 +35,7 @@ function openLoginPage() {
                     _ASPNET_SessionId = mc[1];
                     console.log(`Cookie ASP.NET_SessionId: ${_ASPNET_SessionId}`);
                 }
-                let patm =  new RegExp('<input type="hidden" name="_ASPNetRecycleSession" id="_ASPNetRecycleSession" value="(.*?)" />');
+                let patm = new RegExp('<input type="hidden" name="_ASPNetRecycleSession" id="_ASPNetRecycleSession" value="(.*?)" />');
                 let mm = patm.exec(html);
                 if (mm) {
                     _ASPNetRecycleSession = mm[1];
@@ -75,7 +75,7 @@ function login() {
         response.on('end', () => {
             let buff = Buffer.concat(chunks);
             let html = buff.toString();
-            if (response.statusCode===302) {
+            if (response.statusCode === 302) {
                 let fo = fs.createWriteStream('tmp/step2-login.html');
                 fo.write(html);
                 fo.end();
@@ -113,7 +113,7 @@ function login() {
         path: "/OGWeb/LoginForm.aspx",
         method: "POST",
         headers: {
-            'Cookie': 'ASP.NET_SessionId='+_ASPNET_SessionId,   // NOTED.
+            'Cookie': 'ASP.NET_SessionId=' + _ASPNET_SessionId,   // NOTED.
             'Content-Type': 'application/x-www-form-urlencoded',
             'Content-Length': Buffer.byteLength(postData)
         }
@@ -144,23 +144,23 @@ function step3() {
         response.on('end', () => {
             let buff = Buffer.concat(chunks);
             let html = buff.toString();
-            if (response.statusCode===200) {
+            if (response.statusCode === 200) {
                 let fo = fs.createWriteStream('tmp/step3.html');
                 fo.write(html);
                 fo.end();
-                let patm =  new RegExp('<input type="hidden" name="_ASPNetRecycleSession" id="_ASPNetRecycleSession" value="(.*?)" />');
+                let patm = new RegExp('<input type="hidden" name="_ASPNetRecycleSession" id="_ASPNetRecycleSession" value="(.*?)" />');
                 let mm = patm.exec(html);
                 if (mm) {
                     _ASPNetRecycleSession = mm[1];
                     console.log(`Element _ASPNetRecycleSession: ${_ASPNetRecycleSession}`);
                 }
-                let patv =  new RegExp('<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="(.*?)"');
+                let patv = new RegExp('<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="(.*?)"');
                 let mv = patv.exec(html);
                 if (mv) {
                     __VIEWSTATE = mv[1];
                     console.log('Element __VIEWSTATE got');
                 }
-                let pate =  new RegExp('<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="(.*?)"');
+                let pate = new RegExp('<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="(.*?)"');
                 let me = pate.exec(html);
                 if (me) {
                     __EVENTVALIDATION = me[1];
@@ -213,16 +213,17 @@ function inquire(beginDate, endDate, employeeIdOrName, nextPage, nextStep) {
         response.on('end', () => {
             let buff = Buffer.concat(chunks);
             let html = buff.toString();
-            if ( response.statusCode === 200 ) {
+            if (response.statusCode === 200) {
                 let result = parseKQ(html);
                 let fo = fs.createWriteStream(`tmp/step4-inquire-${employeeIdOrName}-${result.curPage}.html`);
                 fo.write(html);
                 fo.end();
-                if ( result.curPage < result.numPages ) {
+                if (result.curPage < result.numPages) {
                     inquire(beginDate, endDate, employeeIdOrName, true, nextStep);
                 } else {
-                    console.log(`Inquiry about ${employeeIdOrName} is done.`);
-                    if ( nextStep ) {   // If provided.
+                    //console.log(`Inquiry about ${employeeIdOrName} is done.`);
+                    ShowDate();
+                    if (nextStep) {   // If provided.
                         nextStep();
                     }
                 }
@@ -251,7 +252,7 @@ function inquire(beginDate, endDate, employeeIdOrName, nextPage, nextStep) {
         'EndDateTB$_TimeEdit': endTime,
         'EmpNoNameCtrl1$InputTB': employeeIdOrName
     };
-    if ( nextPage ) {
+    if (nextPage) {
         postObj['GridPageNavigator1$NextBtn'] = 'Next Page';
     } else {
         postObj['QueryBtn'] = 'Inquire';
@@ -290,47 +291,128 @@ function parseKQ(html) {
     let numPages = 1;
     let rexTotal = new RegExp('<span id="GridPageNavigator1_CurrentPageLB">(.*?)</span>[^]*?<span id="GridPageNavigator1_TotalPageLB">(.*?)</span>');
     let match = rexTotal.exec(html);
-    if ( match ) {
+    if (match) {
         curPage = parseInt(match[1]);
         numPages = parseInt(match[2]);
-        console.log(`Page: ${curPage} / ${numPages}`);
+        //console.log(`Page: ${curPage} / ${numPages}`);
     }
 
     // Update __VIEWSTATE __EVENTVALIDATION
     let rexVS = new RegExp("__VIEWSTATE[\|](.*?)[\|]");
     let matVS = rexVS.exec(html);
-    if ( matVS ) {
+    if (matVS) {
         __VIEWSTATE = matVS[1];
     }
     let rexEV = new RegExp("__EVENTVALIDATION[\|](.*?)[\|]");
     let matEV = rexEV.exec(html);
-    if ( matEV ) {
+    if (matEV) {
         __EVENTVALIDATION = matEV[1];
     }
 
     // Print 刷卡 data
-    console.log(`/Department  /EID  /Name  /Clock Time`);
+    //console.log(`/Department  /EID  /Name  /Clock Time`);
     while (true) {
-        let rex =  new RegExp('<td>(.*?)</td><td>&nbsp;</td><td><.*?>(.*?)</a></td><td>(.*?)</td><td>.*?</td><td>(.*?)</td>',
+        let rex = new RegExp('<td>(.*?)</td><td>&nbsp;</td><td><.*?>(.*?)</a></td><td>(.*?)</td><td>.*?</td><td>(.*?)</td>',
             'g');   // NOTE: 'g' is important
         let m = rex.exec(html);
         if (m) {
-            console.log(`${m[1]} ${m[2]} ${m[3]} ${m[4]}`);
+            //console.log(`${m[1]} ${m[2]} ${m[3]} ${m[4]}`);
+            arrDate.push({ 'sDept': m[1], 'sEID': m[2], 'sName': m[3], 'dTime': m[4], 'dDay': new Date(m[4]).toLocaleDateString() });
+            c++;
             html = html.substr(rex.lastIndex);
         } else {
-			break;
-		}
+            break;
+        }
     }
-    return {curPage: curPage, numPages: numPages};
+    return { curPage: curPage, numPages: numPages };
 }
 
+var dDate = new Date();
+var dDate_E = dDate.toLocaleDateString();//当前日期
+var dDate_S = new Date(dDate.getFullYear(), dDate.getMonth(), 1).toLocaleDateString();//当月第一天
+var arrDate = new Array;
+var c = 0;
 function askAll() {
-    inquire('2020-12-24', '2021-1-11', 'john', false,
-    ()=> inquire('2020-12-28', '2021-1-11', 'S2008001', false,
-    ()=> inquire('2020-12-24', '2021-1-6', 'ANNE', false,
-    ()=> inquire('2020-12-25', '2021-1-08', 'LEO MY CHEN', false,
-    ()=> inquire('2021-01-7', '2021-1-11', 'S0203002', false,
-    function() { console.log("All done.") } )))));
+    inquire(dDate_S, dDate_E, 'mark', false,
+        () => inquire(dDate_S, dDate_E, 'chunrong', false,
+            function () { console.log("All Done.") }));
 }
+
+function ShowDate() {
+    let sDept = '', sEID = '', sName = '', sStatus = '';
+    let tFirst = '';//当日最初刷卡时间
+    let tLast = '';//当日最后刷卡时间
+    let tDate, tDay;//当前日期
+    let isWorkDay;
+
+    tDate = new Date(), tDay = tDate.toLocaleDateString();
+    let arrCurr;
+
+    console.log(`/Department  /EID  /Name  /Status  /Date  /In Time  /Out Time`);
+    while (tDay >= dDate_S) {
+        isWorkDay = new Date(tDay).getDay();
+        if (isWorkDay != 0 && isWorkDay != 6) {
+            arrCurr = arrDate.filter(x => x.dDay === tDay);
+
+            for (let i = arrCurr.length - 1; i >= 0; i--) {
+                if (sEID != arrCurr[i].sEID) {
+                    sDept = arrCurr[i].sDept, sEID = arrCurr[i].sEID, sName = arrCurr[i].sName;
+                }
+                if (tFirst == '') {
+                    tFirst = arrCurr[i].dTime;
+                }
+                else {
+                    tLast = arrCurr[i].dTime;
+                }
+            }
+
+            sStatus = GetStatus(tFirst, tLast, tDay);
+            console.log(`${sDept} ${sEID} ${sName} ${sStatus} [${tDay}] [${tFirst}] [${tLast}]`);
+        }
+
+        //初始化
+        sStatus = '', tFirst = '', tLast = '';
+
+        //下一天
+        tDate = tDate.setDate(tDate.getDate() - 1);
+        tDate = new Date(tDate);
+        tDay = tDate.toLocaleDateString();
+    }
+
+    console.log(`${sName}'s records already showed.`)
+    arrDate.splice(0, arrDate.length);
+}
+
+function GetStatus(tFirst, tLast, tDay) {
+    let sStatus = '';
+    let num;//时间差
+
+    if (tFirst == '' && tLast == '') {
+        sStatus = '请假';
+    }
+    else if (tFirst == '' || tLast == '') {
+        sStatus = '只刷一次';
+    }
+    else if (tFirst != '' && tLast != '') {
+        num = new Date(tLast).getTime() - new Date(tFirst).getTime();
+        num = num / 1000 / 60 / 60;
+        if (new Date(tFirst).getTime() > new Date(tDay + ' 08:50:59').getTime()) {
+            sStatus = '迟到';
+        }
+        if (new Date(tLast).getTime() < new Date(tDay + ' 16:50:59').getTime()) {
+            if (sStatus != '') { sStatus += '|'; }
+            sStatus += '早退';
+        }
+        if (num < 9) {
+            if (sStatus != '') { sStatus += '|'; }
+            sStatus += '工时不足';
+        }
+        if (sStatus == '') {
+            sStatus = '正常';
+        }
+    }
+    return sStatus;
+}
+
 
 openLoginPage();    // Where it all begins.
